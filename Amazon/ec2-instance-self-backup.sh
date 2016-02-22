@@ -64,7 +64,7 @@ done
 
 #Get AMIs
 debug "INFO: Get AMIs"
-amis=$(/usr/bin/aws ec2 describe-images --profile=icx_user --filters "Name=name,Values=${instance_name}__*" --query 'Images[*].{Name:Name,ID:ImageId}')
+amis=$(/usr/bin/aws ec2 describe-images --filters "Name=name,Values=${instance_name}__*" --query 'Images[*].{Name:Name,ID:ImageId}')
 debug "INFO: ${amis}"
 
 amis=$(echo ${amis} | sed 's|\[||g;s|]||g;s| ||g;s|":|=|g;s|},{"|\n|g;s|{"||g;s|,"|;|g;s|\}||g' | sort |  head -n $(expr 1 - ${retain}))
@@ -73,19 +73,19 @@ debug "INFO: to delete : ${amis}"
 for candidat in ${amis}; do
     eval ${candidat}
     debug "INFO: Get ${ID} snapshots"
-    snaps=$(aws ec2 describe-images --profile=icx_user --region ${region} --image-ids ${ID} --output text --query 'Images[*].BlockDeviceMappings[*].Ebs.SnapshotId')
+    snaps=$(aws ec2 describe-images --region ${region} --image-ids ${ID} --output text --query 'Images[*].BlockDeviceMappings[*].Ebs.SnapshotId')
     debug "INFO: Snapshots ${snaps}"
     debug "INFO: Delete ${ID}"
-    res=$(/usr/bin/aws ec2 deregister-image --profile=icx_user --region ${region} --image-id ${ID})
+    res=$(/usr/bin/aws ec2 deregister-image --region ${region} --image-id ${ID})
     for snap in ${snaps}; do
         debug "INFO: + Delete snapshot ${snap}"
-        res=$(aws ec2 delete-snapshot --profile=icx_user --snapshot-id ${snap} --region ${region})
+        res=$(aws ec2 delete-snapshot --snapshot-id ${snap} --region ${region})
     done
 done
 
 # Create AMI
 debug "INFO: Creating AMI"
-ami=$(aws ec2 create-image --profile=icx_user --no-reboot --region=${region} --instance-id ${instance_id} --no-reboot --name ${instance_name}__`date "+%Y-%m-%d_%H-%M-%S"`)
+ami=$(aws ec2 create-image --no-reboot --region=${region} --instance-id ${instance_id} --no-reboot --name ${instance_name}__`date "+%Y-%m-%d_%H-%M-%S"`)
 debug "INFO: ${ami}"
 
 exit
