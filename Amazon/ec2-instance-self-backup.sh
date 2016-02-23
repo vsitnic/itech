@@ -1,9 +1,9 @@
 #!/bin/bash
 ###########################################################
 #
-# ec2-instance self backup script. 
-# No args required 
-# By default it gets instance name from AWS console and create AMI with "noreboot" 
+# ec2-instance self backup script.
+# No args required
+# By default it gets instance name from AWS console and create AMI with "noreboot"
 # Keep 3 copy by default
 #
 # Add cron job according to your requirements (daily/weekly/monthly)
@@ -14,7 +14,7 @@
 ## Can be replaces by configured server role
 
 region=$(curl  -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region|awk -F\" '{print $4}')
-instance_name=$(curl -s http://169.254.169.254/latest/meta-data/public-keys/ | cut -d '=' -f 2 )
+instance_name=$(hostname -s)
 instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id/)
 retain=3
 
