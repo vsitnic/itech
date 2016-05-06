@@ -6,17 +6,17 @@ It is very useful for daily/weekly backup.
 Usage 
 
 ```bash
-Usage: ec2-instance-backup.sh [OPTIONS]
+Usage: ec2_instance_backup.sh [OPTIONS]
   -n, --instance-name     Instance name
   -i, --instance-id       Instance Id
   -r, --retain-copy       Number of copies (default 3)
-  -R, --region            Region (default us-west-2)
+  -R, --region            Region (default autodetect from local instance)
   -D, --debug             Debug mode
   -H, --help              Print this help
 ```
 
 AMI name will be formated from "instance-name" argument and current date.
-Format : ${instance_name}-`date "+%Y%m%d"`
+Format : ${instance_name}__`date "+%Y%m%d"`
 
 To keep environment up, we use "noreboot" option.
 
@@ -29,7 +29,7 @@ It is very useful for daily/weekly backup.
 Usage 
 
 ```bash
-Usage: ec2-self-image.sh [OPTIONS]
+Usage: ec2_self_backup.sh [OPTIONS]
   -n, --instance-name     Custom instance name (default get automatically from aws
   -r, --retain-copy       Number of copies (default 3)
   -D, --debug             Debug mode
@@ -38,4 +38,4 @@ Usage: ec2-self-image.sh [OPTIONS]
 
 
 # Requirements
-*AmazonEC2ReadOnlyAccess* cgranted by aws cli or server role configured
+"ec2:DescribeInstances", "ec2:DescribeImages", "ec2:DeregisterImage", "ec2:DeleteSnapshot" granted by aws KEY or server role configured

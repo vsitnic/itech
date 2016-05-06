@@ -1,4 +1,5 @@
 #!/bin/bash
+
 ###########################################################
 #
 # ec2-instance self backup script.
@@ -10,12 +11,14 @@
 #
 ###########################################################
 
-## USES USER PROFILE IN ~/.aws/config indirect
-## Can be replaces by configured server role
+
+profile=''
+## USES ICX_USER PROFILE IN ~/.aws/config
+now=$(date "+%Y-%m-%d_%H-%M-%S")
 
 region=$(curl  -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region|awk -F\" '{print $4}')
-instance_name=$(hostname -s)
 instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id/)
+instance_name=$(aws ec2 describe-tags  --region us-west-2 --filters "Name=resource-id,Values=${instance_id}" --output text | awk '{print $5}')
 retain=3
 
 
@@ -24,7 +27,8 @@ print_usage() {
     echo
     echo "Usage: $(basename $0) [OPTIONS]"
     echo "  -n, --instance-name     Custom instance name (default get automatically from aws)"
-    echo "  -r, --retain-copy       Number of copies (default 3)"
+    echo "  -r, --retain-copy       Number of copies (default ${retain})"
+    echo "  -p, --profile           Profile, if special"
     echo "  -D, --debug             Debug mode"
     echo "  -H, --help              Print this help"
     echo
@@ -44,6 +48,7 @@ for arg; do
     case "$arg" in
         --instance-name)              args="${args}-n " ;;
         --retain-copy)                args="${args}-r " ;;
+        --profile)                    args="${args}-p " ;;
         --debug)                      args="${args}-D " ;;
         --help)                       args="${args}-H " ;;
         *)                      [[ "${arg:0:1}" == "-" ]] || delim="\""
@@ -53,10 +58,11 @@ done
 eval set -- "$args"
 
 # Parsing arguments
-while getopts "n:r:DH" Option; do
+while getopts "n:r:p:DH" Option; do
     case $Option in
         n) instance_name=$OPTARG ; args_count=$(expr ${args_count} + 1 );;
         r) retain=$OPTARG ;;
+        p) profile="--profile $OPTARG" ;;
         D) DEBUG="debug" ;;
         *) print_usage; check_result 1 "bad args" ;;
     esac
@@ -64,7 +70,7 @@ done
 
 #Get AMIs
 debug "INFO: Get AMIs"
-amis=$(/usr/bin/aws ec2 describe-images --filters "Name=name,Values=${instance_name}__*" --query 'Images[*].{Name:Name,ID:ImageId}')
+amis=$(/usr/bin/aws ec2 describe-images ${profile} --region ${region} --filters "Name=name,Values=${instance_name}__*" --query 'Images[*].{Name:Name,ID:ImageId}')
 debug "INFO: ${amis}"
 
 amis=$(echo ${amis} | sed 's|\[||g;s|]||g;s| ||g;s|":|=|g;s|},{"|\n|g;s|{"||g;s|,"|;|g;s|\}||g' | sort |  head -n $(expr 1 - ${retain}))
@@ -73,19 +79,23 @@ debug "INFO: to delete : ${amis}"
 for candidat in ${amis}; do
     eval ${candidat}
     debug "INFO: Get ${ID} snapshots"
-    snaps=$(aws ec2 describe-images --region ${region} --image-ids ${ID} --output text --query 'Images[*].BlockDeviceMappings[*].Ebs.SnapshotId')
+    snaps=$(aws ec2 describe-images ${profile} --region ${region} --image-ids ${ID} --output text --query 'Images[*].BlockDeviceMappings[*].Ebs.SnapshotId')
     debug "INFO: Snapshots ${snaps}"
     debug "INFO: Delete ${ID}"
-    res=$(/usr/bin/aws ec2 deregister-image --region ${region} --image-id ${ID})
+    res=$(/usr/bin/aws ec2 deregister-image ${profile} --region ${region} --image-id ${ID})
     for snap in ${snaps}; do
         debug "INFO: + Delete snapshot ${snap}"
-        res=$(aws ec2 delete-snapshot --snapshot-id ${snap} --region ${region})
+        res=$(aws ec2 delete-snapshot ${profile} --region ${region} --snapshot-id ${snap} )
     done
 done
 
 # Create AMI
 debug "INFO: Creating AMI"
-ami=$(aws ec2 create-image --no-reboot --region=${region} --instance-id ${instance_id} --no-reboot --name ${instance_name}__`date "+%Y-%m-%d_%H-%M-%S"`)
+ami=$(aws ec2 create-image ${profile} --region ${region} --no-reboot --instance-id ${instance_id} --no-reboot --name ${instance_name}__${now})
 debug "INFO: ${ami}"
+ami=$(echo ${ami} | cut -d '"' -f 4)
+debug "INFO: Tag AMI ${instance_name}"
+tag=$(aws ec2 create-tags ${profile} --region ${region} --resources ${ami} --tags Key=Name,Value=${instance_name}"__"${now} )
+debug "INFO: ${tag}"
 
 exit
